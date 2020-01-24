@@ -27,8 +27,14 @@ namespace startapidotnet.Controllers
         [HttpGet("{id}")]
         public IActionResult index(int id)
         {
-            var user = this.database.users.First(u => u.id == id);
-            return Ok(user);
+            try {
+                var user = this.database.users.First(u => u.id == id);
+                Response.StatusCode = 200;
+                return Ok(user);
+            } catch(Exception) {
+                Response.StatusCode = 404;
+                return new ObjectResult(new {mensagem = "User not found"});
+            }
         }
 
         [HttpPost]
@@ -44,7 +50,7 @@ namespace startapidotnet.Controllers
             database.SaveChanges();
 
             Response.StatusCode = 201;
-            return Ok(userModel);
+            return new ObjectResult(u);
         }
 
         [HttpPut]
@@ -66,10 +72,15 @@ namespace startapidotnet.Controllers
         [HttpDelete("{id}")]
         public IActionResult delete(int id)
         {
-            UserModel user = this.database.users.First(u => u.id == id);
-            this.database.users.Remove(user);
-            database.SaveChanges();
-            return Ok("ok");
+            try {
+                UserModel user = this.database.users.First(u => u.id == id);
+                this.database.users.Remove(user);
+                database.SaveChanges();
+                return Ok("ok");
+            } catch(Exception) {
+                Response.StatusCode = 400;
+                return new ObjectResult("");
+            }
         }
     }
 }
