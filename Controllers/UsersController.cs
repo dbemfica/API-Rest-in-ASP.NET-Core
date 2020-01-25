@@ -44,7 +44,7 @@ namespace startapidotnet.Controllers
             u.nome = userModel.nome;
             u.email = userModel.email;
             u.login = userModel.login;
-            u.password = userModel.password;
+            u.password = BCrypt.Net.BCrypt.HashPassword(userModel.password);
         
             database.users.Add(u);
             database.SaveChanges();
@@ -60,7 +60,7 @@ namespace startapidotnet.Controllers
             user.nome = userModel.nome;
             user.email = userModel.email;
             user.login = userModel.login;
-            user.password = userModel.password;
+            user.password = BCrypt.Net.BCrypt.HashPassword(userModel.password);
         
             database.users.Update(user);
             database.SaveChanges();
