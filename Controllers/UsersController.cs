@@ -1,9 +1,14 @@
 using System;
 using System.Linq;
-using Microsoft.AspNetCore.Http;
+using System.Text;
 using Microsoft.AspNetCore.Mvc;
 using startapidotnet.Database;
 using startapidotnet.Models;
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+using System.Collections.Generic;
+using System.Security.Claims;
+using Microsoft.Extensions.Configuration;
 
 namespace startapidotnet.Controllers
 {
@@ -12,9 +17,11 @@ namespace startapidotnet.Controllers
     public class UsersController : ControllerBase
     {
         private readonly ApplicationDbContext database;
+        private IConfiguration config;
 
-        public UsersController(ApplicationDbContext database){
+        public UsersController(ApplicationDbContext database, IConfiguration config){
             this.database = database;
+            this.config = config;
         }
 
         [HttpGet]
@@ -81,6 +88,40 @@ namespace startapidotnet.Controllers
                 Response.StatusCode = 400;
                 return new ObjectResult("");
             }
+        }
+
+        [HttpPost("login")]
+        public IActionResult login([FromBody] UserModel credentials)
+        {
+            UserModel user = null;
+            try {
+                user = this.database.users.First(u => u.login == credentials.login);
+            } catch(Exception) {
+                Response.StatusCode = 404;
+                return new ObjectResult(new {mensagem = "User not found"});
+            }
+
+            bool validPassword = BCrypt.Net.BCrypt.Verify(credentials.password, user.password);
+            if (validPassword == false) {
+                Response.StatusCode = 404;
+                return new ObjectResult(new {mensagem = "User not found"});
+            }
+
+            var symetrictKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(this.config["JwtSecretKey"]));
+            var signingCredentials = new SigningCredentials(symetrictKey,SecurityAlgorithms.HmacSha256Signature);
+
+            var claims = new List<Claim>();
+            claims.Add(new Claim("id",user.id.ToString()));
+            claims.Add(new Claim("email",user.email));
+            claims.Add(new Claim("login",user.login));
+
+            var JWT = new JwtSecurityToken(
+                expires: DateTime.Now.AddHours(1),
+                signingCredentials: signingCredentials,
+                claims: claims
+            ); 
+
+            return Ok(new { token = new JwtSecurityTokenHandler().WriteToken(JWT)});
         }
     }
 }
