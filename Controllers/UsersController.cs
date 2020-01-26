@@ -9,6 +9,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Collections.Generic;
 using System.Security.Claims;
 using Microsoft.Extensions.Configuration;
+using Microsoft.AspNetCore.Authorization;
 
 namespace startapidotnet.Controllers
 {
@@ -25,6 +26,7 @@ namespace startapidotnet.Controllers
         }
 
         [HttpGet]
+        [Authorize]
         public IActionResult index()
         {
             var users = this.database.users.ToList();
@@ -32,6 +34,7 @@ namespace startapidotnet.Controllers
         }
 
         [HttpGet("{id}")]
+        [Authorize]
         public IActionResult index(int id)
         {
             try {
@@ -45,6 +48,7 @@ namespace startapidotnet.Controllers
         }
 
         [HttpPost]
+        [Authorize]
         public IActionResult create([FromBody] UserModel userModel)
         {
             UserModel u = new UserModel();
@@ -61,6 +65,7 @@ namespace startapidotnet.Controllers
         }
 
         [HttpPut]
+        [Authorize]
         public IActionResult update([FromBody] UserModel userModel)
         {
             UserModel user = this.database.users.First(u => u.id == userModel.id);
@@ -77,6 +82,7 @@ namespace startapidotnet.Controllers
         }
 
         [HttpDelete("{id}")]
+        [Authorize]
         public IActionResult delete(int id)
         {
             try {
@@ -108,7 +114,7 @@ namespace startapidotnet.Controllers
             }
 
             var symetrictKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(this.config["JwtSecretKey"]));
-            var signingCredentials = new SigningCredentials(symetrictKey,SecurityAlgorithms.HmacSha256Signature);
+            var signingCredentials = new SigningCredentials(symetrictKey,SecurityAlgorithms.HmacSha256);
 
             var claims = new List<Claim>();
             claims.Add(new Claim("id",user.id.ToString()));

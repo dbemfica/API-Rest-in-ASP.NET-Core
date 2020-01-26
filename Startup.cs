@@ -1,16 +1,12 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+using System.Text;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.HttpsPolicy;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using startapidotnet.Database;
 
 namespace startapidotnet
@@ -29,6 +25,18 @@ namespace startapidotnet
         {
             services.AddDbContext<ApplicationDbContext>(options => options.UseMySql(Configuration.GetConnectionString("DefaultConnection")));
             services.AddControllers();
+
+            // string jwtSecretKey = Configuration["JwtSecretKey"];
+            string jwtSecretKey = "dfksjkfjskldjflksjflksjkldflksdf";
+            var symetrictKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecretKey));   
+            services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options => {
+                options.TokenValidationParameters = new TokenValidationParameters{
+                    ValidateIssuerSigningKey = true,
+                    IssuerSigningKey = symetrictKey,
+                    ValidateIssuer = false,
+                    ValidateAudience = false
+                };
+            });
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -39,6 +47,7 @@ namespace startapidotnet
                 app.UseDeveloperExceptionPage();
             }
 
+            app.UseAuthentication();
             app.UseHttpsRedirection();
             app.UseRouting();
             app.UseAuthorization();
