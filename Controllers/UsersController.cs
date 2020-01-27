@@ -1,36 +1,29 @@
-using System;
-using System.Linq;
-using System.Text;
 using Microsoft.AspNetCore.Mvc;
 using startapidotnet.Database;
 using startapidotnet.Models;
-using Microsoft.IdentityModel.Tokens;
-using System.IdentityModel.Tokens.Jwt;
-using System.Collections.Generic;
-using System.Security.Claims;
 using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Authorization;
+using startapidotnet.Services;
 
 namespace startapidotnet.Controllers
 {
     [ApiController]
     [Route("/users")]
-    public class UsersController : ControllerBase
+    public class UsersController : CustomController
     {
-        private readonly ApplicationDbContext database;
-        private IConfiguration config;
-
-        public UsersController(ApplicationDbContext database, IConfiguration config){
-            this.database = database;
-            this.config = config;
-        }
+        public UsersController(ApplicationDbContext database, IConfiguration config): base(database, config){}
 
         [HttpGet]
         [Authorize]
         public IActionResult index()
         {
-            var users = this.database.users.ToList();
-            return Ok(users);
+            try {
+                var users = this.service("startapidotnet.Services.ListUsers");
+                return Ok(users);
+            } catch (ServiceException e) {
+                Response.StatusCode = e.code;
+                return new ObjectResult(new {message = e.message});
+            }
         }
 
         [HttpGet("{id}")]
@@ -38,12 +31,11 @@ namespace startapidotnet.Controllers
         public IActionResult index(int id)
         {
             try {
-                var user = this.database.users.First(u => u.id == id);
-                Response.StatusCode = 200;
-                return Ok(user);
-            } catch(Exception) {
-                Response.StatusCode = 404;
-                return new ObjectResult(new {mensagem = "User not found"});
+                var users = this.service("startapidotnet.Services.GetUser", new {id = id});
+                return Ok(users);
+            } catch (ServiceException e) {
+                Response.StatusCode = e.code;
+                return new ObjectResult(new {mensagem = e.message});
             }
         }
 
@@ -51,34 +43,41 @@ namespace startapidotnet.Controllers
         [Authorize]
         public IActionResult create([FromBody] UserModel userModel)
         {
-            UserModel u = new UserModel();
-            u.nome = userModel.nome;
-            u.email = userModel.email;
-            u.login = userModel.login;
-            u.password = BCrypt.Net.BCrypt.HashPassword(userModel.password);
-        
-            database.users.Add(u);
-            database.SaveChanges();
-
-            Response.StatusCode = 201;
-            return new ObjectResult(u);
+            try {
+                dynamic parameters = new {
+                    nome = userModel.nome,
+                    email = userModel.email,
+                    login = userModel.login,
+                    password = userModel.password
+                };
+                var users = this.service("startapidotnet.Services.CreateUser", parameters);
+                Response.StatusCode = 201;
+                return new ObjectResult(users);
+            } catch (ServiceException e) {
+                Response.StatusCode = e.code;
+                return new ObjectResult(new {mensagem = e.message});
+            }
         }
 
         [HttpPut]
         [Authorize]
         public IActionResult update([FromBody] UserModel userModel)
         {
-            UserModel user = this.database.users.First(u => u.id == userModel.id);
-            user.nome = userModel.nome;
-            user.email = userModel.email;
-            user.login = userModel.login;
-            user.password = BCrypt.Net.BCrypt.HashPassword(userModel.password);
-        
-            database.users.Update(user);
-            database.SaveChanges();
-
-            Response.StatusCode = 200;
-            return Ok(userModel);
+            try {
+                dynamic parameters = new {
+                    id = userModel.id,
+                    nome = userModel.nome,
+                    email = userModel.email,
+                    login = userModel.login,
+                    password = userModel.password
+                };
+                var users = this.service("startapidotnet.Services.UpdateUser", parameters);
+                Response.StatusCode = 200;
+                return new ObjectResult(users);
+            } catch (ServiceException e) {
+                Response.StatusCode = e.code;
+                return new ObjectResult(new {mensagem = e.message});
+            }
         }
 
         [HttpDelete("{id}")]
@@ -86,48 +85,32 @@ namespace startapidotnet.Controllers
         public IActionResult delete(int id)
         {
             try {
-                UserModel user = this.database.users.First(u => u.id == id);
-                this.database.users.Remove(user);
-                database.SaveChanges();
-                return Ok("ok");
-            } catch(Exception) {
-                Response.StatusCode = 400;
-                return new ObjectResult("");
+                dynamic parameters = new {
+                    id = id
+                };
+                this.service("startapidotnet.Services.DeleteUser", parameters);
+                return Ok();
+            } catch (ServiceException e) {
+                Response.StatusCode = e.code;
+                return new ObjectResult(new {mensagem = e.message});
             }
         }
 
         [HttpPost("login")]
         public IActionResult login([FromBody] UserModel credentials)
         {
-            UserModel user = null;
             try {
-                user = this.database.users.First(u => u.login == credentials.login);
-            } catch(Exception) {
-                Response.StatusCode = 404;
-                return new ObjectResult(new {mensagem = "User not found"});
+                dynamic parameters = new {
+                    login = credentials.login,
+                    password = credentials.password
+                };
+                var token = this.service("startapidotnet.Services.Login", parameters);
+                Response.StatusCode = 200;
+                return new ObjectResult(token);
+            } catch (ServiceException e) {
+                Response.StatusCode = e.code;
+                return new ObjectResult(new {mensagem = e.message});
             }
-
-            bool validPassword = BCrypt.Net.BCrypt.Verify(credentials.password, user.password);
-            if (validPassword == false) {
-                Response.StatusCode = 404;
-                return new ObjectResult(new {mensagem = "User not found"});
-            }
-
-            var symetrictKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(this.config["JwtSecretKey"]));
-            var signingCredentials = new SigningCredentials(symetrictKey,SecurityAlgorithms.HmacSha256);
-
-            var claims = new List<Claim>();
-            claims.Add(new Claim("id",user.id.ToString()));
-            claims.Add(new Claim("email",user.email));
-            claims.Add(new Claim("login",user.login));
-
-            var JWT = new JwtSecurityToken(
-                expires: DateTime.Now.AddHours(1),
-                signingCredentials: signingCredentials,
-                claims: claims
-            ); 
-
-            return Ok(new { token = new JwtSecurityTokenHandler().WriteToken(JWT)});
         }
     }
 }
